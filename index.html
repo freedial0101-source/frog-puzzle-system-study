@@ -1,0 +1,349 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Giyomu Games - frog puzzle 簡易Web版</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+
+        button.active {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #45a049;
+        }
+
+        #message-box {
+            height: 24px;
+            font-weight: bold;
+            color: #d32f2f;
+            margin-bottom: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            background-color: #fff;
+        }
+
+        td {
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
+            font-size: 18px;
+            position: relative;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        /* フォーカス時の枠線 */
+        td:focus {
+            outline: 2px solid #000;
+            z-index: 10;
+        }
+
+        /* カエルの見た目 */
+        .frog-marker {
+            width: 20px;
+            height: 20px;
+            background-color: #2ecc71;
+            border-radius: 50%;
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            z-index: 5;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>frog puzzle 簡易Web版</h1>
+
+    <!-- サイズ変更用コントロール -->
+    <div class="controls">
+        <button onclick="changeSize('row', 1)">上下の端一列を増やす</button>
+        <button onclick="changeSize('row', -1)">上下の端一列を減らす</button>
+        <button onclick="changeSize('col', 1)">左右の端一行を増やす</button>
+        <button onclick="changeSize('col', -1)">左右の端一行を減らす</button>
+    </div>
+
+    <!-- モード切り替え用コントロール -->
+    <div class="controls">
+        <button id="btn-create" onclick="setMode('create')">パズルを作る</button>
+        <button id="btn-sign" onclick="setMode('sign')">指示記号を置く</button>
+        <button id="btn-start" onclick="setMode('start')">スタート</button>
+    </div>
+
+    <!-- メッセージ表示エリア -->
+    <div id="message-box"></div>
+
+    <!-- ゲーム盤面 -->
+    <table id="game-table"></table>
+
+    <script>
+        // 初期設定（最大縦19、横17）
+        let maxRows = 19;
+        let maxCols = 17;
+        // 現在の表示サイズ（最初は最大サイズで生成）
+        let currentRows = maxRows;
+        let currentCols = maxCols;
+
+        let currentMode = ''; // 'create', 'sign', 'start'
+        let focusedCell = null;
+        let gameInterval = null;
+
+        // ゲームの状態管理
+        let startCell = null; // {r, c}
+        let goalCell = null;  // {r, c}
+        let frog = { r: 0, c: 0, dir: 'up' }; // カエルの位置と向き
+        let history = []; // 通った位置の履歴配列 [{r, c}, ...]
+
+        // マスごとの状態を保持する2次元配列 (0〜maxRows-1, 0〜maxCols-1)
+        // type: 'light-blue'(水色), 'white'(白), 'red'(赤), 'yellow'(黄), 'gray'(灰色)
+        // sign: '', '←', '↑', '→', '↓', 'J', 'B'
+        let gridData = [];
+
+        // 初期データ構造の作成
+        for (let r = 0; r < maxRows; r++) {
+            gridData[r] = [];
+            for (let c = 0; c < maxCols; c++) {
+                gridData[r][c] = { type: 'light-blue', sign: '' };
+            }
+        }
+
+        const tableEl = document.getElementById('game-table');
+        const msgEl = document.getElementById('message-box');
+
+        // 盤面の描画関数
+        function renderTable() {
+            tableEl.innerHTML = '';
+            for (let r = 0; r < currentRows; r++) {
+                const tr = document.createElement('tr');
+                for (let c = 0; c < currentCols; c++) {
+                    const td = document.createElement('td');
+                    td.setAttribute('tabindex', '0'); // フォーカス可能にする
+                    td.dataset.r = r;
+                    td.dataset.c = c;
+
+                    // フォーカスが外れないように位置を記憶
+                    td.addEventListener('focus', () => { focusedCell = { r, c }; });
+
+                    const cell = gridData[r][c];
+
+                    // 1. 色の設定
+                    if (cell.type === 'light-blue') td.style.backgroundColor = '#87CEEB';
+                    else if (cell.type === 'white') td.style.backgroundColor = '#ffffff';
+                    else if (cell.type === 'red') td.style.backgroundColor = '#ff4d4d';
+                    else if (cell.type === 'yellow') td.style.backgroundColor = '#ffd700';
+                    else if (cell.type === 'gray') td.style.backgroundColor = '#b0bec5';
+
+                    // 2. 枠線の設定（外周2行・列の判定）
+                    const isOuter = (r < 2 || r >= currentRows - 2 || c < 2 || c >= currentCols - 2);
+                    if (isOuter) {
+                        td.style.border = '1px solid transparent';
+                    } else {
+                        if (cell.type === 'light-blue') {
+                            td.style.border = '1px solid rgba(0, 0, 0, 0.2)'; // 半透明
+                        } else {
+                            td.style.border = '1px solid #000000'; // 実線
+                        }
+                    }
+
+                    // 3. 指示記号の表示
+                    td.textContent = cell.sign;
+
+                    // 4. カエルの表示
+                    if (startCell && startCell.r === r && startCell.c === c) {
+                        // カエル（緑の円）の追加
+                        const frogMarker = document.createElement('div');
+                        frogMarker.className = 'frog-marker';
+                        td.appendChild(frogMarker);
+                    }
+
+                    tr.appendChild(td);
+                }
+                tableEl.appendChild(tr);
+            }
+
+            // フォーカスの再当て
+            if (focusedCell) {
+                const target = tableEl.querySelector(`td[data-r="${focusedCell.r}"][data-c="${focusedCell.c}"]`);
+                if (target) target.focus();
+            }
+        }
+
+        // サイズ変更ボタンの処理
+        function changeSize(target, delta) {
+            if (currentMode === 'start') return; // スタート中は変更不可
+
+            if (target === 'row') {
+                let nextRows = currentRows + (delta * 2); // 上下1列ずつなので計2増減
+                if (nextRows >= 5 && nextRows <= maxRows) { // 最低限内側が保てるサイズ
+                    currentRows = nextRows;
+                }
+            } else if (target === 'col') {
+                let nextCols = currentCols + (delta * 2); // 左右1行ずつなので計2増減
+                if (nextCols >= 5 && nextCols <= maxCols) {
+                    currentCols = nextCols;
+                }
+            }
+            // 範囲外に出たスタート/ゴールをクリア
+            checkOutBounds();
+            renderTable();
+        }
+
+        function checkOutBounds() {
+            if (startCell && (startCell.r >= currentRows || startCell.c >= currentCols)) {
+                gridData[startCell.r][startCell.c].type = 'white';
+                startCell = null;
+            }
+            if (goalCell && (goalCell.r >= currentRows || goalCell.c >= currentCols)) {
+                gridData[goalCell.r][goalCell.c].type = 'white';
+                goalCell = null;
+            }
+        }
+
+        // モード切り替え
+        function setMode(mode) {
+            if (gameInterval) clearInterval(gameInterval);
+            msgEl.textContent = '';
+            currentMode = mode;
+
+            document.getElementById('btn-create').className = mode === 'create' ? 'active' : '';
+            document.getElementById('btn-sign').className = mode === 'sign' ? 'active' : '';
+            document.getElementById('btn-start').className = mode === 'start' ? 'active' : '';
+
+            // スタートから他モードに切り替わった場合、盤面をリセット（灰色を白、カエルをスタートへ）
+            if (mode !== 'start') {
+                resetGameTrack();
+            }
+
+            renderTable();
+
+            if (mode === 'start') {
+                runGame();
+            }
+        }
+
+        function resetGameTrack() {
+            for (let r = 0; r < currentRows; r++) {
+                for (let c = 0; c < currentCols; c++) {
+                    if (gridData[r][c].type === 'gray') {
+                        gridData[r][c].type = 'white';
+                    }
+                }
+            }
+            if (startCell) {
+                frog = { r: startCell.r, c: startCell.c, dir: 'up' };
+            }
+            history = [];
+        }
+
+        // キーボード操作のイベントハンドラ
+        window.addEventListener('keydown', (e) => {
+            if (!focusedCell) return;
+            let r = focusedCell.r;
+            let c = focusedCell.c;
+
+            // 共通：矢印キーによるフォーカス移動
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                if (e.key === 'ArrowUp' && r > 0) r--;
+                if (e.key === 'ArrowDown' && r < currentRows - 1) r++;
+                if (e.key === 'ArrowLeft' && c > 0) c--;
+                if (e.key === 'ArrowRight' && c < currentCols - 1) c++;
+                focusedCell = { r, c };
+                const target = tableEl.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+                if (target) target.focus();
+                return;
+            }
+
+            const cell = gridData[r][c];
+
+            // 1. パズルを作るモード
+            if (currentMode === 'create') {
+                if (e.key === 'z' || e.key === 'Z') {
+                    if (cell.type === 'light-blue') {
+                        cell.type = 'white';
+                    } else if (cell.type === 'white') {
+                        cell.type = 'light-blue';
+                        cell.sign = ''; // 水色に戻るときは文字も消す
+                    }
+                    // 赤や黄色の場合は水色には戻さない（sやgでリセットさせるため）
+                    renderTable();
+                }
+                if (e.key === 's' || e.key === 'S') {
+                    if (cell.type === 'red') {
+                        cell.type = 'white';
+                        startCell = null;
+                    } else {
+                        // 既存の赤を白に戻す
+                        if (startCell) gridData[startCell.r][startCell.c].type = 'white';
+                        cell.type = 'red';
+                        cell.sign = ''; // 記号は置けないルール
+                        startCell = { r, c };
+                    }
+                    renderTable();
+                }
+                if (e.key === 'g' || e.key === 'G') {
+                    if (cell.type === 'yellow') {
+                        cell.type = 'white'; goalCell = null;
+                    } else {
+                        // 既存の黄を白に戻す
+                        if (goalCell) gridData[goalCell.r][goalCell.c].type = 'white';
+                        cell.type = 'yellow'; cell.sign = '';
+                        // 記号は置けないルール// 
+                        goalCell = { r, c };
+                    } renderTable();
+                }
+            }
+            // // 2. 指示記号を置くモード
+            if (currentMode === 'sign') {
+                // スタート（赤）とゴール（黄）には置けない
+                if (cell.type === 'red' || cell.type === 'yellow') return;
+                // 白マス（または一度踏んだ等のベースが白系統のマス）にのみ置ける（水色には置けない仕様）
+                if (cell.type === 'white' || cell.type === 'gray') {
+                    if (e.key === 'a' || e.key === 'A') cell.sign = '←'; if (e.key === 'w' || e.key === 'W') cell.sign = '↑';
+                    if (e.key === 'd' || e.key === 'D') cell.sign = '→'; if (e.key === 'x' || e.key === 'X') cell.sign = '↓';
+                    if (e.key === 'q' || e.key === 'Q') cell.sign = 'J'; if (e.key === 'e' || e.key === 'E') cell.sign = 'B';
+                    if (e.key === 's' || e.key === 'S') cell.sign = ''; renderTable();
+                }
+            }
+        });
+    
+    </script>
+
+
+</body>
+</html>

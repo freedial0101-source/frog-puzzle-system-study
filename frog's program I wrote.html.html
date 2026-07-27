@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="jp">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>フロッグ パズル アルゴリズム</title>
+
+
+  <link rel="stylesheet">
+</head>
+
+<body>
+
+
+ 
+
+  <script>
+    let field = [];
+    for (let i = 0; i < 4; i++) {
+      field[i] = [];
+      for (let j = 0; j < 4; j++) {
+        field[i][j] = ["白", "まだ"];
+        if ((i + j) % 2 === 0) {
+          field[i][j][0] = "板";
+
+        }
+      }
+    }
+
+    const fieldOrder =
+      [["下", "なし", "なし", "左"],
+      ["右", "下", "右", "上"],
+      ["右", "なし", "上", "なし"],
+      ["なし", "右", "なし", "上"]];
+    fieldOrder.forEach((x, index1) => x.forEach((y, index2) => field[index1][index2][1] = y));
+
+    const direction = ["上", "下", "右", "左"];
+    const jumping = { "上": [-1, 0], "下": [1, 0], "右": [0, 1], "左": [0, -1] };
+
+    
+    let fieldSize = [3, 3];
+    field[3][0][0] = "スタート";
+    field[2][3][0] = "ゴール";
+    let frog = [3, 0];
+    let frogDirection = "上";
+    let jampRange = 1;
+    let histry =[];
+  
+  
+  
+
+
+    function followOrder() {
+
+      const orderNow = field[frog[0]][frog[1]][1];
+      if (direction.includes(orderNow)) {
+        frogDirection = orderNow;
+      } else if (orderNow == "J") {
+        jampRange = 2;
+      } else if (orderNow == "戻") {
+     console.log(histry);
+         for(let i=0;i<2;i++){histry.pop()};
+        // console.log("現在のhistry:"+histry);
+
+        // console.log("histry"+ histry);
+        frog = [(histry.at(-1)).at(0),(histry.at(-1)).at(1)];
+        console.log("戻った!:"+frog);
+      }
+    }
+
+    function jump() {
+      // console.log([frog,frogDirection,jampRange]);
+      histry.push([...frog,frogDirection,jampRange]);
+      // console.log(histry);
+      jumping[frogDirection].forEach((x, index) => frog[index] = frog[index] + x * jampRange);
+      jampRange = 1;
+      
+    }
+
+    function checkOnField() {
+      frog[0] < 0 || fieldSize[0] < frog[0] || frog[1] < 0 || fieldSize[1] < frog[1]
+    }
+
+    function checkV() {
+      // console.log(frog);
+      if (checkOnField()) {
+        console.log("落ちてしまった！(その１)");
+        return false;
+      } else {
+        let color = field[frog[0]][frog[1]][0];
+        if (color == "黒") {
+          console.log("落ちてしまった(その２)");
+          return false;
+        } else if (color == "板") {
+          field[frog[0]][frog[1]][0] = "黒";
+          return true;
+        } else if (color == "白") {
+          field[frog[0]][frog[1]][0] = "灰";
+
+          return true;
+        } else { return true; }
+
+
+      }
+    }
+
+    function checkGoal() {
+      // console.log(frog);
+      if (field[frog[0]][frog[1]][0] == "ゴール") {
+
+        return true;
+      } else {
+
+        return false;
+      }
+    }
+
+    function checkClear() {
+      return field.every(x => x.every(y => y[0] != "白" && y[0] != "板"));
+    }
+
+    const fieldcolor = [];
+    field.forEach((x, index1) => {
+      fieldcolor[index1] = [];
+      x.forEach((y, index2) => fieldcolor[index1][index2] = y[0]
+      )
+    });
+
+    console.log(fieldcolor);
+
+
+    function playFrogjamp() {
+      while(!checkGoal()){
+   jump();
+        console.log("ジャンプ後:" + frog)
+        if (!checkV()) {
+          console.log("ここでストップ");
+          return
+        }
+        // console.log("落ちないかの確認後:"+frog);
+        followOrder();
+      }
+
+     
+        if (checkClear()) {
+          console.log("クリア！");
+          console.log(field.map(x=>x.map(y=>y[0])));
+          // console.log(histry);
+        } else {
+          console.log("通っていないマスがあります！");
+        }
+        return;
+
+
+      }
+
+
+    
+
+    playFrogjamp();
+
+    field =
+      [[["ゴール", ""], ["黒", ""], ["黒", ""], ["黒", ""]],
+
+      [["黒", ""], ["黒", ""], ["黒", ""], ["黒", ""]],
+
+      [["白", "J"], ["白", "戻"], ["黒", ""], ["黒", ""]],
+      [["白", ""], ["白", ""], ["黒", ""], ["黒", ""]],
+
+      [["黒", ""], ["黒", ""], ["黒", ""], ["黒", ""]],
+
+      [["白", "J"], ["白", "J"], ["白", "下"], ["黒", ""]],
+      [["白", "下"], ["白", "左"], ["白", "戻"], ["黒", ""]],
+      [["白", "J"], ["白", "J"], ["白", "J"], ["黒", ""]],
+
+      [["黒", ""], ["黒", ""], ["黒", ""], ["黒", ""]],
+
+      [["白", "J"], ["白", "J"], ["白", "J"], ["白", "下"]],
+      [["白", "上"], ["白", "上"], ["白", "左"], ["白", "戻"]],
+      [["白", "右"], ["白", "J"], ["白", "J"], ["白", "戻"]],
+      [["スタート", ""], ["白", "J"], ["白", "上"], ["白", "左"]]];
+
+    frog = [12, 0];
+    fieldSize = [12, 3];
+
+    frogDirection = "上";
+    histry =[]; 
+    // [[...frog]];
+    console.log(frog);
+    console.log(histry);
+    console.log(field.length);
+    console.log(field[0].length);
+
+    playFrogjamp();
+
+
+    field = [[["白", "右"], ["白", "なし"], ["白", "戻"]],
+    [["スタート", "なし"], ["白", "なし"], ["ゴール", "なし"]]];
+    frog = [1, 0];
+    fieldSize = [1, 2];
+    frogDirection = "上";
+    histry=[];
+    // = [[1, 0]];
+    console.log([...frog]);
+    console.log(histry);
+    playFrogjamp();
+
+
+  </script>
+
+
+
+</body>
+
+</html>
