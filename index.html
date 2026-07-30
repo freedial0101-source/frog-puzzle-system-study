@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Giyomu Games - frog puzzle 簡易Web版</title>
+    <title>frog puzzle(by Giyomu Games) study</title>
     <style>
         body {
             font-family: sans-serif;
@@ -341,7 +341,118 @@
                 }
             }
         });
-    
+     // 3. カエルを動かすモードのメインループ
+        function runGame() {
+            if (!startCell) {
+                msgEl.textContent = 'スタート地点(S)がありません！';
+                return;
+            }
+            // カエルの初期化
+            frog = {
+                r: startCell.r, c: startCell.c, dir: 'up'
+            };
+            history = [];
+            // 履歴の初期化
+            // スタート位置を最初に記録
+            history.push({ r: frog.r, c: frog.c });
+            // ループ開始（0.4秒ごとに1マス動くイメージ）
+            gameInterval = setInterval(() => {
+                // 1. 現在いるマスの指示記号チェック
+                let currentCell = gridData[frog.r][frog.c];
+                let skipMove = false;
+                // JやBの特殊処理用フラグ
+                if (currentCell.sign === '←') frog.dir = 'left';
+                else if (currentCell.sign === '↑') frog.dir = 'up';
+                else if (currentCell.sign === '→') frog.dir = 'right';
+                else if (currentCell.sign === '↓') frog.dir = 'down';
+                else if (currentCell.sign === 'J') {
+                    // 進行方向に1マス飛ばして移動（＝次の移動で2マス進む）
+                    let nextPos = getNextPosition(frog.r, frog.c, frog.dir, 2);
+                    frog.r = nextPos.r;
+                    frog.c = nextPos.c;
+                    skipMove = true;
+                 // 通常の1マス移動はスキップ
+                 }
+                 else if (currentCell.sign === 'B') {
+                        // 配列の履歴から新しいもの3つを削除できるかチェック
+                        if (history.length < 4) {
+                            // 自分自身(1) + 戻る3マス分 ＝ 履歴に最低4つ必要
+                            msgEl.textContent = '戻れません！';
+                            clearInterval(gameInterval);
+                            return;
+                        }
+                        // 新しい記録3つを消去
+                        history.pop();
+                        history.pop();
+                        history.pop();
+                        // 一番新しく記録されている場所（3マス前）に移る（向きはそのまま）
+                        let prevPos = history[history.length - 1];
+                        frog.r = prevPos.r;
+                        frog.c = prevPos.c;
+                        skipMove = true;
+                        // 移動処理は終わっているので通常の移動はスキップ
+                    }
+                    // 通常移動（JやB以外の通常矢印・記号なしの場合）
+                    if (!skipMove) {
+                        let nextPos = getNextPosition(frog.r, frog.c, frog.dir, 1);
+                        frog.r = nextPos.r;
+                        frog.c = nextPos.c;
+                    }
+                    // 移動後のマスが盤面外（エラー防止）
+                    if (frog.r < 0 || frog.r >= currentRows || frog.c < 0 || frog.c >= currentCols) {
+                        msgEl.textContent = '盤面外に飛び出しました！';
+                        clearInterval(gameInterval);
+                        return;
+                    }
+                    // 移動後のマスの状態を取得
+                    let nextCell = gridData[frog.r][frog.c];
+                    // 履歴に現在の場所を記録（Bのときはすでにある場所に戻るので重複記録しないよう設計）
+                    if (currentCell.sign !== 'B') {
+                        history.push({ r: frog.r, c: frog.c });
+                    }
+                    // 2. 移動後のマスの色変化（白マスなら灰色にする。スタート・ゴール・水色はそのまま）
+                    if (nextCell.type === 'white') { nextCell.type = 'gray'; }
+                    // 3. カエルの位置表示を更新するためにスタート位置を偽装して再描画
+                    startCell = { r: frog.r, c: frog.c };
+                    renderTable();
+                    // 4. 各種判定// 水色マスに着水
+                    if (nextCell.type === 'light-blue') {
+                        msgEl.textContent = '着水！';
+                        clearInterval(gameInterval);
+                        return;
+                    }
+                    // ゴール判定
+                if(nextCell.type === 'yellow') {
+                        // 残っている白マスがあるかチェック
+                        let hasWhite = false;
+                        for (let r = 0; r < currentRows; r++) {
+                            for (let c = 0; c < currentCols; c++) {
+                                if (gridData[r][c].type === 'white') {
+                                    hasWhite = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!hasWhite) {
+                            msgEl.textContent = 'ゴール！';
+                        } else {
+                            msgEl.textContent = 'まだ通っていないマスがあります！';
+                        } clearInterval(gameInterval);
+                        return;
+                    }
+                }, 400);
+            // 400ミリ秒ごとに実行
+             }
+            // // 進行方向とマス数から次の座標を計算するヘルパー
+            function getNextPosition(r, c, dir, steps) {
+                if (dir === 'up') r -= steps;
+                if (dir === 'down') r += steps;
+                if (dir === 'left') c -= steps;
+                if (dir === 'right') c += steps;
+                return { r, c };
+            }
+            // 初期起動時の描画
+            renderTable();
     </script>
 
 
