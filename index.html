@@ -146,6 +146,7 @@
         let gameInterval = null;
 
         // ゲームの状態管理
+        let originalStartCell=null;
         let startCell = null; // {r, c}
         let goalCell = null;  // {r, c}
         let frog = { r: 0, c: 0, dir: 'up' }; // カエルの位置と向き
@@ -329,12 +330,14 @@
                 if (e.key === 's' || e.key === 'S') {
                     if (cell.type === 'red') {
                         cell.type = 'white';
+                        originalStartCell = null;
                         startCell = null;
                     } else {
                         // 既存の赤を白に戻す
-                        if (startCell) gridData[startCell.r][startCell.c].type = 'white';
+                        if (originalStartCell) gridData[originalStartCell.r][originalStartCell.c].type = 'white';
                         cell.type = 'red';
                         cell.sign = ''; // 記号は置けないルール
+                        originalStartCell={r,c};
                         startCell = { r, c };
                     }
                     renderTable();
@@ -381,7 +384,7 @@
             }
             // カエルの初期化
             frog = {
-                r: startCell.r, c: startCell.c, dir: 'up'
+                r: originalStartCell.r, c: originalStartCell.c, dir: 'up'
             };
             history = [];
             // 履歴の初期化
