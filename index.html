@@ -83,6 +83,7 @@
             left: 5px;
             z-index: 5;
         }
+        
     </style>
 </head>
 
@@ -104,12 +105,33 @@
         <button id="btn-sign" onclick="setMode('sign')">指示記号を置く</button>
         <button id="btn-start" onclick="setMode('start')">スタート</button>
     </div>
+   
 
     <!-- メッセージ表示エリア -->
     <div id="message-box"></div>
 
     <!-- ゲーム盤面 -->
     <table id="game-table"></table>
+
+ <div class="explainment">
+        <p>フロッグパズルの概要</p>
+        <ul>
+            <li>自動で動くカエル（本アプリでは緑色の玉）が全てのマスを通ってゴールできるよう、
+                <br> 白いマスに記号を置いていくパズルゲームです。 </li>
+            <li>置ける記号と効果
+                <br>矢印記号:カエルの向きを変える(初期は上を向いている)、 
+                <br>　　　 J:カエルをジャンプさせる、
+                <br>　　　 B:カエルの向きを保ったまま、元来たマスを3つ分戻る。</li>        
+        </ul>
+        <p>操作方法</p>
+                <ul>
+            <li>矢印キーでマス目を移動できる</li>
+            <li>「パズルを作る」ボタンを押している間、
+                <br> zキー:白マスの設置・撤去、sキー:スタートの設置、gキー:ゴールの設置</li>
+            <li>「指示記号を置く」ボタンを押している間、各記号の置き方
+                <br>sキー:（記号を消す）、wキー:↑、dキー:→、xキー:↓、aキー:←、qキー:J、eキー:B</li>
+        </ul>
+    </div>
 
     <script>
         // 初期設定（最大縦19、横17）
@@ -168,17 +190,17 @@
                     else if (cell.type === 'yellow') td.style.backgroundColor = '#ffd700';
                     else if (cell.type === 'gray') td.style.backgroundColor = '#b0bec5';
 
-                    // 2. 枠線の設定（外周2行・列の判定）
-                    const isOuter = (r < 2 || r >= currentRows - 2 || c < 2 || c >= currentCols - 2);
-                    if (isOuter) {
-                        td.style.border = '1px solid transparent';
-                    } else {
+                    // // 2. 枠線の設定（外周2行・列の判定）
+                    // const isOuter = (r < 2 || r >= currentRows - 2 || c < 2 || c >= currentCols - 2);
+                    // if (isOuter) {
+                    //     td.style.border = '1px solid transparent';
+                    // } else {
                         if (cell.type === 'light-blue') {
                             td.style.border = '1px solid rgba(0, 0, 0, 0.2)'; // 半透明
                         } else {
                             td.style.border = '1px solid #000000'; // 実線
                         }
-                    }
+                    // }
 
                     // 3. 指示記号の表示
                     td.textContent = cell.sign;
@@ -267,7 +289,8 @@
             if (startCell) {
                 frog = { r: startCell.r, c: startCell.c, dir: 'up' };
             }
-            history = [];
+            // history = [];
+            // ↑はいるのか？
         }
 
         // キーボード操作のイベントハンドラ
@@ -341,8 +364,17 @@
                 }
             }
         });
-     // 3. カエルを動かすモードのメインループ
+
+        // 3. カエルを動かすモードのメインループ
         function runGame() {
+             msgEl.textContent="";
+            //  gridData.forEach(x=>x.forEach(y=>{
+            //     if(y.type=="gray"){
+            //         y.type="white"
+            //     }
+            // }));
+            resetGameTrack();
+
             if (!startCell) {
                 msgEl.textContent = 'スタート地点(S)がありません！';
                 return;
@@ -359,19 +391,14 @@
             gameInterval = setInterval(() => {
                 // 1. 現在いるマスの指示記号チェック
                 let currentCell = gridData[frog.r][frog.c];
-                let skipMove = false;
+                let jampRange=1;
                 // JやBの特殊処理用フラグ
                 if (currentCell.sign === '←') frog.dir = 'left';
                 else if (currentCell.sign === '↑') frog.dir = 'up';
                 else if (currentCell.sign === '→') frog.dir = 'right';
                 else if (currentCell.sign === '↓') frog.dir = 'down';
                 else if (currentCell.sign === 'J') {
-                    // 進行方向に1マス飛ばして移動（＝次の移動で2マス進む）
-                    let nextPos = getNextPosition(frog.r, frog.c, frog.dir, 2);
-                    frog.r = nextPos.r;
-                    frog.c = nextPos.c;
-                    skipMove = true;
-                 // 通常の1マス移動はスキップ
+                    jampRange=2;
                  }
                  else if (currentCell.sign === 'B') {
                         // 配列の履歴から新しいもの3つを削除できるかチェック
@@ -389,15 +416,15 @@
                         let prevPos = history[history.length - 1];
                         frog.r = prevPos.r;
                         frog.c = prevPos.c;
-                        skipMove = true;
+          
                         // 移動処理は終わっているので通常の移動はスキップ
                     }
                     // 通常移動（JやB以外の通常矢印・記号なしの場合）
-                    if (!skipMove) {
-                        let nextPos = getNextPosition(frog.r, frog.c, frog.dir, 1);
+                    
+                        let nextPos = getNextPosition(frog.r, frog.c, frog.dir, jampRange);
                         frog.r = nextPos.r;
                         frog.c = nextPos.c;
-                    }
+                    
                     // 移動後のマスが盤面外（エラー防止）
                     if (frog.r < 0 || frog.r >= currentRows || frog.c < 0 || frog.c >= currentCols) {
                         msgEl.textContent = '盤面外に飛び出しました！';
@@ -407,9 +434,9 @@
                     // 移動後のマスの状態を取得
                     let nextCell = gridData[frog.r][frog.c];
                     // 履歴に現在の場所を記録（Bのときはすでにある場所に戻るので重複記録しないよう設計）
-                    if (currentCell.sign !== 'B') {
-                        history.push({ r: frog.r, c: frog.c });
-                    }
+                 
+                         history.push({ r: frog.r, c: frog.c });
+                    
                     // 2. 移動後のマスの色変化（白マスなら灰色にする。スタート・ゴール・水色はそのまま）
                     if (nextCell.type === 'white') { nextCell.type = 'gray'; }
                     // 3. カエルの位置表示を更新するためにスタート位置を偽装して再描画
@@ -457,4 +484,5 @@
 
 
 </body>
+
 </html>
